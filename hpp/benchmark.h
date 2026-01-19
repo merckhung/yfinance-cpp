@@ -12,7 +12,7 @@ namespace Benchmarking {
         std::vector<std::chrono::milliseconds> durations;
         durations.reserve(iters);
 
-        for (int it = 0; it < iters; it++) {
+        for (std::size_t it = 0; it < iters; it++) {
             time_point t0 = std::chrono::high_resolution_clock::now();
             f(std::forward<Args>(args)...);
             time_point t1 = std::chrono::high_resolution_clock::now();

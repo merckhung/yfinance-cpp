@@ -2,7 +2,7 @@
 #include "../hpp/benchmark.h"
 
 
-void summary(int argc, char** argv) {
+int main(int argc, char** argv) {
 
 	// Initialize the Ticker object:
 	yfinance::Symbol* tk;

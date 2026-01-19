@@ -4,6 +4,19 @@
 
 namespace Utils {
 
+    void split(std::vector<std::string>& strs, const std::string& str, const std::string& delimiter) {
+        strs.clear();
+        std::string s = str;
+        size_t pos = 0;
+        std::string token;
+        while ((pos = s.find(delimiter)) != std::string::npos) {
+            token = s.substr(0, pos);
+            strs.push_back(token);
+            s.erase(0, pos + delimiter.length());
+        }
+        strs.push_back(s);
+    }
+
     namespace Statics {
 
         namespace Quotes {
@@ -24,8 +37,8 @@ namespace Utils {
         }
 
         namespace Summary {
-            const std::string v11 =
-                "https://query2.finance.yahoo.com/v11/finance/quoteSummary/";
+            const std::string v10 =
+                "https://query2.finance.yahoo.com/v10/finance/quoteSummary/";
         }
 
         namespace News {

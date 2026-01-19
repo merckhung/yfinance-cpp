@@ -1,0 +1,9 @@
+module(
+    name = "yfinance_cpp",
+    version = "0.0.1",
+)
+
+bazel_dep(name = "nlohmann_json", version = "3.11.3")
+bazel_dep(name = "cpr", version = "1.14.1")
+bazel_dep(name = "curl", version = "8.8.0")
+

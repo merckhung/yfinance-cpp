@@ -16,6 +16,8 @@ namespace Utils {
             std::vector<Structures::Option>> Options;
     }
 
+    void split(std::vector<std::string>& strs, const std::string& str, const std::string& delimiter);
+
     namespace Statics {
 
         namespace Quotes {
@@ -29,7 +31,7 @@ namespace Utils {
         }
 
         namespace Summary {
-            extern const std::string v11;
+            extern const std::string v10;
         }
 
         namespace News {

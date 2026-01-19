@@ -2,11 +2,11 @@
 #include "../hpp/benchmark.h"
 
 
-void quotes(int argc, char** argv) {
+int main(int argc, char** argv) {
 
 	// Initialize the Ticker object:
 	yfinance::Symbol* tk;
-	tk = new yfinance::Symbol("AAPL");
+	tk = new yfinance::Symbol("TSLA");
 
 	// Loading quotes into struct:
 	auto quotes = tk->get_quotes("1d");
@@ -21,7 +21,7 @@ void quotes(int argc, char** argv) {
 		std::placeholders::_3, std::placeholders::_4);
 
 	auto timeit = Benchmarking::Timeit(
-		100, f, "1h", -1, -1, ",");
+		5, f, "1d", -1, -1, ",");
 	
 	// Printing benchmark results:
 	std::cout << timeit;

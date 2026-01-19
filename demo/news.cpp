@@ -2,7 +2,7 @@
 #include "../hpp/benchmark.h"
 
 
-void news() {
+int main() {
 
 	yfinance::Symbol* symbol;
 	symbol = new yfinance::Symbol("AAPL");

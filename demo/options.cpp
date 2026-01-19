@@ -2,11 +2,11 @@
 #include "../hpp/benchmark.h"
 
 
-void options(int argc, char** argv) {
+int main(int argc, char** argv) {
 
 	// Initialize the Ticker object:
 	yfinance::Symbol* tk;
-	tk = new yfinance::Symbol("GS");
+	tk = new yfinance::Symbol("TSLA");
 
 	// Loading options into struct:
 	auto options = tk->get_options();

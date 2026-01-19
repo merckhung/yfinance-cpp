@@ -1,11 +1,10 @@
 #pragma once
-#include <boost/algorithm/string.hpp>
-#include "boost/lexical_cast.hpp"
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <string>
 #include <regex>
 #include <cpr/cpr.h>
+#include "../hpp/session.h"
 #include "../hpp/structures.h"
 #include "../hpp/utils.h"
 using json = nlohmann::json;
@@ -37,6 +36,10 @@ namespace yfinance {
         );
 
         Utils::Types::Options get_options(
+            time_t date = 0
+        );
+
+        std::vector<time_t> get_expiration_dates(
         );
 
         Structures::Profile get_profile(

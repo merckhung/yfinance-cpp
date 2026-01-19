@@ -7,6 +7,7 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <unordered_set>
+#include <optional>
 using milliseconds = std::chrono::milliseconds;
 
 
@@ -106,12 +107,12 @@ namespace Structures {
             m_strike(strike), 
             m_lastPrice(lastPrice), 
             m_change(change),
+            m_volume(volume),
             m_bid(bid), 
             m_ask(ask), 
             m_percentChange(percentChange),
             m_openInterest(openInterest), 
             m_impliedVolatility(impliedVolatility),
-            m_volume(volume), 
             m_expiration(expiration),
             m_lastTradeDate(lastTradeDate) 
         {};
@@ -232,10 +233,10 @@ namespace Structures {
             stream << "=======================================================================\n\n";
 
             stream << "\tIterations completed\t: " << t.m_iters << "\n";
-            stream << "\tTotal milliseconds\t:" << t.m_sum << "\n";
-            stream << "\tAverage milliseconds\t:" << t.m_avg << "\n";
-            stream << "\tMaxima milliseconds\t:" << t.m_max << "\n";
-            stream << "\tMinima milliseconds\t:" << t.m_min << "\n\n\n";
+            stream << "\tTotal milliseconds\t:" << t.m_sum.count() << "\n";
+            stream << "\tAverage milliseconds\t:" << t.m_avg.count() << "\n";
+            stream << "\tMaxima milliseconds\t:" << t.m_max.count() << "\n";
+            stream << "\tMinima milliseconds\t:" << t.m_min.count() << "\n\n\n";
             return stream;
         }
     };

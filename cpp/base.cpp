@@ -1,9 +1,46 @@
 #include "../hpp/base.h"
 #include "../hpp/utils.h"
 #include "../hpp/methods.h"
+#include "../hpp/requests.h"
 
 
 namespace yfinance {
+
+    // Helper for parsing option chain
+    static Utils::Types::Options parse_option_chain(const json& rjson) {
+        Utils::Types::Options options;
+        std::vector<Structures::Option> calls, puts;
+        options["calls"] = calls;
+        options["puts"] = puts;
+
+        for (auto& kind : { "calls", "puts" }) {
+            if (!rjson["optionChain"]["result"][0]["options"][0].contains(kind)) continue;
+            
+            auto& raw = rjson["optionChain"]["result"][0]["options"][0][kind];
+            unsigned int size = raw.size();
+            for (unsigned int i = 0; i < size; i++) {
+                Structures::Option option;
+                for (auto& [key, val] : raw[i].items()) {
+                    if (key == "inTheMoney") option.m_inTheMoney = (bool)val;
+                    if (key == "contractSymbol") option.m_contractSymbol = val;
+                    if (key == "currency") option.m_currency = val;
+                    if (key == "contractSize") option.m_contractSize = val;
+                    if (key == "strike") option.m_strike = std::stof(val.dump());
+                    if (key == "lastPrice") option.m_lastPrice = std::stof(val.dump());
+                    if (key == "change") option.m_change = std::stof(val.dump());
+                    if (key == "percentChange") option.m_percentChange = std::stof(val.dump());
+                    if (key == "openInterest") option.m_openInterest = std::stof(val.dump());
+                    if (key == "bid") option.m_bid = std::stof(val.dump());
+                    if (key == "ask") option.m_ask = std::stof(val.dump());
+                    if (key == "impliedVolatility") option.m_impliedVolatility = std::stof(val.dump());
+                    if (key == "expiration") option.m_expiration = (time_t)std::stoll(val.dump());
+                    if (key == "lastTradeDate") option.m_lastTradeDate = (time_t)std::stoll(val.dump());
+                }
+                options[kind].emplace_back(option);
+            }
+        }
+        return options;
+    }
 
 	Structures::Quotes Symbol::get_quotes(
 		const std::string&& interval,
@@ -25,10 +62,10 @@ namespace yfinance {
 				Utils::Statics::Quotes::ranges[interval]));
 		}
 
-		std::string period1 = boost::lexical_cast<std::string>(std::move(start));
-		std::string period2 = boost::lexical_cast<std::string>(std::move(end));
+		std::string period1 = std::to_string(start);
+		std::string period2 = std::to_string(end);
 
-		cpr::Response r = cpr::Get(cpr::Url{
+		cpr::Response r = Session::getInstance().Get(cpr::Url{
 			Utils::Statics::Quotes::v8 + m_symbol },
 			cpr::Parameters{ {"interval", interval},
 				{"period1", period1}, {"period2", period2} });
@@ -36,15 +73,15 @@ namespace yfinance {
 		if ((r.status_code == 200) && (!r.text.empty())) {
 			json rjson = nlohmann::json::parse(r.text);
 
-			// Read json' string to vector of strings through boost-split:
+			// Read json' string to vector of strings through Utils::split:
 			std::unordered_map<std::string, std::vector<std::string>> quotemap;
-			boost::split(quotemap["unix"], Methods::substring(
+			Utils::split(quotemap["unix"], Methods::substring(
 				rjson["chart"]["result"][0]["timestamp"].dump(), 1, 2),
-				boost::is_any_of(sep));
+				sep);
 			for (auto& col : { "open", "high", "low", "close", "volume" }) {
-				boost::split(quotemap[col], Methods::substring(
+				Utils::split(quotemap[col], Methods::substring(
 					rjson["chart"]["result"][0]["indicators"]
-					["quote"][0][col].dump(), 1, 2), boost::is_any_of(sep));
+					["quote"][0][col].dump(), 1, 2), sep);
 			}
 
 			// Deleting NaNs:
@@ -85,94 +122,54 @@ namespace yfinance {
 		}
 		else {
 			std::string error_message =
-				"Request failed with status code: " + r.status_code;
+				"Request failed with status code: " + std::to_string(r.status_code);
 			throw std::runtime_error(error_message);
 		}
 	}
 
-	Utils::Types::Options Symbol::get_options(
-	) {
-		cpr::Response r = cpr::Get(cpr::Url{
-			Utils::Statics::Options::v7 + m_symbol });
+    Utils::Types::Options Symbol::get_options(time_t date) {
+        cpr::Parameters params = {};
+        if (date != 0) {
+            params.Add({"date", std::to_string(date)});
+        }
 
-		if ((r.status_code == 200) && (!r.text.empty())) {
+        cpr::Response r = Session::getInstance().Get(cpr::Url{
+            Utils::Statics::Options::v7 + m_symbol }, params);
 
-			json rjson = nlohmann::json::parse(r.text);
-			Utils::Types::Options options;
-			std::vector<Structures::Option> calls, puts;
-			options["calls"] = calls;
-			options["puts"] = puts;
+        if ((r.status_code == 200) && (!r.text.empty())) {
+            json rjson = nlohmann::json::parse(r.text);
+            return parse_option_chain(rjson);
+        }
+        else {
+            std::string error_message =
+                "Request failed with status code: " + std::to_string(r.status_code);
+            throw std::runtime_error(error_message);
+        }
+    }
 
-			// Emplacing raw response inside struct
-			// applying casting:
-			for (auto& kind : { "calls", "puts" }) {
+    std::vector<time_t> Symbol::get_expiration_dates() {
+        cpr::Response r = Session::getInstance().Get(cpr::Url{
+            Utils::Statics::Options::v7 + m_symbol });
 
-				if (!rjson["optionChain"]["result"][0]
-					["options"][0].contains(kind)) continue;
-				
-				auto& raw = rjson["optionChain"]["result"][0]
-					["options"][0][kind];
-
-				unsigned int size = raw.size();
-				for (int i = 0; i < size; i++) {
-					Structures::Option option;
-					for (auto& [key, val] : raw[i].items()) {
-						// As the response from YFINANCE API may be 
-						// partial, Option() is default initialized
-						// and items are added one at time;
-
-						// Booleans:
-						if (key == "inTheMoney") option.m_inTheMoney =
-							std::move((bool)val);
-
-						// Strings:
-						if (key == "contractSymbol") option.m_contractSymbol =
-							std::move(val);
-						if (key == "currency") option.m_currency =
-							std::move(val);
-						if (key == "contractSize") option.m_contractSize =
-							std::move(val);
-
-						// Floats:
-						if (key == "strike") option.m_strike =
-							std::move(std::stof(val.dump()));
-						if (key == "lastPrice") option.m_lastPrice =
-							std::move(std::stof(val.dump()));
-						if (key == "change") option.m_change =
-							std::move(std::stof(val.dump()));
-						if (key == "percentChange") option.m_percentChange =
-							std::move(std::stof(val.dump()));
-						if (key == "openInterest") option.m_openInterest =
-							std::move(std::stof(val.dump()));
-						if (key == "bid") option.m_bid =
-							std::move(std::stof(val.dump()));
-						if (key == "ask") option.m_ask =
-							std::move(std::stof(val.dump()));
-						if (key == "impliedVolatility") option.m_impliedVolatility =
-							std::move(std::stof(val.dump()));
-
-						// Time_t
-						if (key == "expiration") option.m_expiration =
-							std::move((time_t)std::stoll(val.dump()));
-						if (key == "lastTradeDate") option.m_lastTradeDate =
-							std::move((time_t)std::stoll(val.dump()));
-					}
-					options[kind].emplace_back(option);
-				}
-			}
-			return options;
-		}
-		else {
-			std::string error_message =
-				"Request failed with status code: " + r.status_code;
-			throw std::runtime_error(error_message);
-		}
-	}
+        if ((r.status_code == 200) && (!r.text.empty())) {
+            json rjson = nlohmann::json::parse(r.text);
+            std::vector<time_t> dates;
+            for (auto& item : rjson["optionChain"]["result"][0]["expirationDates"]) {
+                dates.push_back((time_t)std::stoll(item.dump()));
+            }
+            return dates;
+        }
+        else {
+            std::string error_message =
+                "Request failed with status code: " + std::to_string(r.status_code);
+            throw std::runtime_error(error_message);
+        }
+    }
 
 	Structures::Profile Symbol::get_profile(
 	) {
-		cpr::Response r = cpr::Get(cpr::Url{
-			Utils::Statics::Summary::v11 + m_symbol },
+		cpr::Response r = Session::getInstance().Get(cpr::Url{
+			Utils::Statics::Summary::v10 + m_symbol },
 			cpr::Parameters{ {"modules", "assetProfile"} });
 
 		if ((r.status_code == 200) && (!r.text.empty())) {
@@ -198,7 +195,7 @@ namespace yfinance {
 		}
 		else {
 			std::string error_message =
-				"Request failed with status code: " + r.status_code;
+				"Request failed with status code: " + std::to_string(r.status_code);
 			throw std::runtime_error(error_message);
 		}
 		
@@ -207,8 +204,8 @@ namespace yfinance {
 	nlohmann::json Symbol::get_summary(
 		const std::string&& module
 	) {
-		cpr::Response r = cpr::Get(cpr::Url{
-			Utils::Statics::Summary::v11 + m_symbol },
+		cpr::Response r = Session::getInstance().Get(cpr::Url{
+			Utils::Statics::Summary::v10 + m_symbol },
 			cpr::Parameters{ {"modules", module} });
 		
 		if ((r.status_code == 200) && (!r.text.empty())) {
@@ -218,14 +215,14 @@ namespace yfinance {
 		}
 		else {
 			std::string error_message =
-				"Request failed with status code: " + r.status_code;
+				"Request failed with status code: " + std::to_string(r.status_code);
 			throw std::runtime_error(error_message);
 		}
 	}
 
 	std::vector<Structures::News> Symbol::get_news(
 	) {
-		cpr::Response r = cpr::Get(cpr::Url{
+		cpr::Response r = Session::getInstance().Get(cpr::Url{
 			Utils::Statics::News::v11 + m_symbol });
 
 		if ((r.status_code == 200) && (!r.text.empty())) {
@@ -240,8 +237,8 @@ namespace yfinance {
 			std::vector<std::string> t_relatedTickers;
 			for (auto& n : newsSummary) {
 				auto relatedTickers = n["relatedTickers"].dump();
-				boost::split(t_relatedTickers, relatedTickers.substr(1,
-					relatedTickers.size() - 2), boost::is_any_of(","));
+				Utils::split(t_relatedTickers, relatedTickers.substr(1,
+					relatedTickers.size() - 2), ",");
 				std::for_each(t_relatedTickers.begin(), t_relatedTickers.end(),
 					[&](std::string& s) { s = std::regex_replace(
 						s, std::regex("[^\\w\\d\\.]+"), ""); });
@@ -254,7 +251,7 @@ namespace yfinance {
 		}
 		else {
 			std::string error_message =
-				"Request failed with status code: " + r.status_code;
+				"Request failed with status code: " + std::to_string(r.status_code);
 			throw std::runtime_error(error_message);
 		}
 	}
